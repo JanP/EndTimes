@@ -4,8 +4,8 @@ from PyQt4 import QtCore, QtGui
 
 import Keypad
 
-def onFinished(string):
-	print string
+def onFinished(value):
+	print value
 	QtGui.QApplication.closeAllWindows()
 
 def onBackspace():

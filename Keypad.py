@@ -7,7 +7,7 @@ from PyQt4.QtGui import QDialog
 keypadForm = uic.loadUiType("Keypad.ui")[0]
 
 class Keypad(QDialog, keypadForm):
-	finished = pyqtSignal(QString)
+	finished = pyqtSignal(int)
 	keyPressed = pyqtSignal(int)
 	backspace = pyqtSignal()
 
@@ -85,4 +85,6 @@ class Keypad(QDialog, keypadForm):
 		self.keypadDisplay.backspace()
 		
 	def handleKeyOK(self):
-		self.finished.emit(self.keypadDisplay.text())
+                value, ok = self.keypadDisplay.text().toInt(10)
+                if (ok):
+                        self.finished.emit(value)
