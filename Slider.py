@@ -7,8 +7,7 @@ from PyQt4.QtGui import QDialog
 sliderForm = uic.loadUiType("Slider.ui")[0]
 
 class Slider(QDialog, sliderForm):
-    finished =  pyqtSignal(QString)
-    slide = pyqtSignal(int)
+    finished = pyqtSignal(int)
 
     def __init__(self, parent = None):
         QDialog.__init__(self, parent)
@@ -16,4 +15,8 @@ class Slider(QDialog, sliderForm):
         self.setupBehaviour()
 
     def setupBehaviour(self):
-        print "todo"
+        self.slider.valueChanged.connect(self.lcd.display)
+        self.done.clicked.connect(self.handleDone)
+
+    def handleDone(self):
+        self.finished.emit(self.lcd.intValue())
