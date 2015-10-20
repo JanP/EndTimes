@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sys
-from PyQt4 import QtGui, QtCore
+from PyQt4 import QtGui, QtCore, QtSql
 
 class Main(QtGui.QMainWindow):
     def __init__(self):
@@ -11,6 +11,12 @@ class Main(QtGui.QMainWindow):
         self.statusBar()
         self.setupMainMenu()
         self.showMaximized()
+
+        self.playersFilename = ""
+        self.players = []
+
+        self.damagesFilename = ""
+        self.damages = []
 
     def setupMainMenu(self):
         self.mainMenu = self.menuBar()
@@ -26,6 +32,12 @@ class Main(QtGui.QMainWindow):
 
         self.damageOverviewMenu = self.mainMenu.addMenu("&Damage Overview")
         self.damageOverviewMenu.addAction(self.setupGenerateDamageOverviewAction())
+
+    def displayWarning(self, title, text):
+        msgBox = QtGui.QMessageBox(self)
+        msgBox.setWindowTitle(title)
+        msgBox.setText(text)
+        msgBox.exec_()
 
     def setupNewAction(self):
         self.newAction = QtGui.QAction("&New", self)
@@ -70,27 +82,117 @@ class Main(QtGui.QMainWindow):
         return self.generateDamageOverviewAction
 
     def new(self):
-        print("New Database")
+        self.playersFilename = QtGui.QFileDialog.getSaveFileName(self, "Create New Players File", "Players.csv", "*.csv")
+        if (self.playersFilename == ""):
+            self.displayWarning("Error", "No valid players file selected!")
+            return
+
+        self.damagesFilename = QtGui.QFileDialog.getSaveFileName(self, "Create New Damages File", "Damages.csv", "*.csv")
+        if (self.damagesFilename == ""):
+            self.displayWarning("Error", "No valid damages file selected!")
+            return
+
+        self.updateMainWindow()
+
+    def readLines(self, filename):
+        fd = open(filename, 'r')
+        lines = fd.readlines()
+        fd.close()
+        return lines
+
+    def readPlayers(self, filename):
+        lines = self.readLines(filename)
+        for line in lines:
+            line = line.strip().split(';')
+            self.players.append((int(line[0]),line[1],line[2]))
+        print self.players
+
+    def readDamages(self, filename):
+        lines = self.readLines(filename)
+        for line in lines:
+            line = line.strip().split(';')
+            self.damages.append((int(line[0]),line[1],line[2],int(line[3])))
+        print self.damages
 
     def open(self):
-        print("Open Existing Database")
+        self.playersFilename = QtGui.QFileDialog.getOpenFileName(self, "Open Existing Players File", "Players.csv", "*.csv")
+        if (self.playersFilename == ""):
+            self.displayWarning("Error", "No valid players file selected!")
+            return
+
+        self.damagesFilename = QtGui.QFileDialog.getOpenFileName(self, "Open Existing Damages File", "Damages.csv", "*.csv")
+        if (self.damagesFilename == ""):
+            self.displayWarning("Error", "No valid damages file selected!")
+            return
+
+        self.players = []
+        self.readPlayers(self.playersFilename)
+        self.damages = []
+        self.readDamages(self.damagesFilename)
+
+        self.updateMainWindow()
 
     def close(self):
         print("Quiting")
         sys.exit()
 
+    def writePlayers(self, filename):
+        fd = open(filename, 'w')
+        lines = []
+        for player in self.players:
+            lines.append(str(player[0]) + ";" + player[1] + ";" + player[2] + "\n")
+        fd.writelines(lines)
+        fd.close()
+
+    def writeDamages(self, filename):
+        fd = open(filename, 'w')
+        lines = []
+        for damage in self.damages:
+            lines.append(str(damage[0]) + ";" + damage[1] + ";" + damage[2] + ";" + str(damage[3]) + "\n")
+        fd.writelines(lines)
+        fd.close()
+
     def addPlayer(self):
         print("Add Player")
 
+        # No players file selected
+        if (self.playersFilename == ""):
+            self.displayWarning("Error", "No valid players file selected!")
+            return
+
+        playerName, ok = QtGui.QInputDialog.getText(self, "Player details", "Enter the player's name:")
+        if (not ok):
+            self.displayWarning("Warning", "No player name entered! Cancelling player entry.")
+            return
+
+        playerImage = QtGui.QFileDialog.getOpenFileName(self, "Open Player Image", "", "*.jpg")
+        if (playerImageFilename == ""):
+            self.displayWarning("Warning", "No player image selected! Cancelling player entry.")
+            return
+
+        # No players in file
+        if (not self.players):
+            playerEntry = (1, playerName, playerImageFilename)
+        else:
+            playerEntry = (self.players[-1][0] + 1, playerName, playerImageFilename)
+        self.players.append(playerEntry)
+
+        self.writePlayers(self.playersFilename)
+
+        self.updateMainWindow()
+        
     def removePlayer(self):
         print("Remove Player")
 
     def generateDamageOverview(self):
         print("Generate Damage Overview")
+
+        filename = QtGui.QFileDialog.getSaveFileName(self, "Save Damage Overview", "DamageOverview.pdf", "*.pdf")
+
         printer = QtGui.QPrinter()
         printer.setPageSize(QtGui.QPrinter.A4)
         printer.setOutputFormat(QtGui.QPrinter.PdfFormat)
-        printer.setOutputFileName("DamageOverview.pdf")
+        printer.setOutputFileName(filename)
 
         document = QtGui.QTextDocument()
         header = QtGui.QTextCursor(document)
