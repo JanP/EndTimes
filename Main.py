@@ -1,7 +1,32 @@
 #!/usr/bin/python
 
 import sys
-from PyQt4 import QtGui, QtCore, QtSql
+from PyQt4 import QtGui, QtCore
+
+class RemovePlayerDialog(QtGui.QDialog):
+    def __init__(self, players, parent = None):
+        super(RemovePlayerDialog, self).__init__(parent)
+
+        self.vbox = QtGui.QVBoxLayout(self)
+        self.buttongroup = QtGui.QButtonGroup()
+        for (playerId, playerName, playerImageFilename) in players:
+            button = QtGui.QRadioButton(playerName)
+            self.buttongroup.addButton(button, playerId)
+            self.vbox.addWidget(button)
+        buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel, QtCore.Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        self.vbox.addWidget(buttons)
+
+    def getRemovedPlayer(self):
+        return (self.buttongroup.checkedId(), self.buttongroup.checkedButton().text())
+
+    @staticmethod
+    def getPlayerToRemove(players, parent = None):
+        dialog = RemovePlayerDialog(players, parent)
+        result = dialog.exec_()
+        playerId, playerName = dialog.getRemovedPlayer()
+        return (playerId, playerName, result == QtGui.QDialog.Accepted)
 
 class Main(QtGui.QMainWindow):
     def __init__(self):
@@ -92,6 +117,9 @@ class Main(QtGui.QMainWindow):
             self.displayWarning("Error", "No valid damages file selected!")
             return
 
+        self.writePlayers(self.playersFilename)
+        self.writeDamages(self.damagesFilename)
+
         self.updateMainWindow()
 
     def readLines(self, filename):
@@ -165,7 +193,7 @@ class Main(QtGui.QMainWindow):
             self.displayWarning("Warning", "No player name entered! Cancelling player entry.")
             return
 
-        playerImage = QtGui.QFileDialog.getOpenFileName(self, "Open Player Image", "", "*.jpg")
+        playerImageFilename = QtGui.QFileDialog.getOpenFileName(self, "Open Player Image", "", "*.jpg")
         if (playerImageFilename == ""):
             self.displayWarning("Warning", "No player image selected! Cancelling player entry.")
             return
@@ -182,7 +210,11 @@ class Main(QtGui.QMainWindow):
         self.updateMainWindow()
         
     def removePlayer(self):
-        print("Remove Player")
+        if (not self.players):
+            return
+
+        playerId, playerName, ok = RemovePlayerDialog.getPlayerToRemove(self.players, self)
+        print(str(playerId) + ";" + playerName + ";" + str(ok))
 
     def generateDamageOverview(self):
         print("Generate Damage Overview")
