@@ -28,6 +28,38 @@ class RemovePlayerDialog(QtGui.QDialog):
         playerId, playerName = dialog.getRemovedPlayer()
         return (playerId, playerName, result == QtGui.QDialog.Accepted)
 
+class PlayerLabel(QtGui.QLabel):
+    clicked = QtCore.pyqtSignal(int, 'QString')
+
+    def __init__(self, playerId, playerName, playerImageFilename, parent = None):
+        super(PlayerLabel, self).__init__(parent)
+
+        self.playerId = playerId
+        self.playerName = playerName
+
+        self.vbox = QtGui.QVBoxLayout(self)
+
+        self.name = QtGui.QLabel(playerName)
+        self.name.setAlignment(QtCore.Qt.AlignCenter)
+
+        self.picture = QtGui.QLabel()
+        pixmap = QtGui.QPixmap(500, 500)
+        image = QtGui.QImage(playerImageFilename)
+        image = image.scaled(500, 500, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+        pixmap.convertFromImage(image)
+        self.picture.setPixmap(pixmap)
+
+        self.vbox.addWidget(self.name)
+        self.vbox.addWidget(self.picture)
+
+        self.setLayout(self.vbox)
+
+    def sizeHint(self):
+        return self.vbox.sizeHint()
+
+    def mouseReleaseEvent(self, ev):
+        self.clicked.emit(playerId, playerName)
+
 class Main(QtGui.QMainWindow):
     def __init__(self):
         super(Main, self).__init__()
@@ -38,7 +70,8 @@ class Main(QtGui.QMainWindow):
         self.showMaximized()
 
         self.playersFilename = ""
-        self.players = []
+        self.players = {}
+        self.nextPlayerId = 1
 
         self.damagesFilename = ""
         self.damages = []
@@ -57,6 +90,9 @@ class Main(QtGui.QMainWindow):
 
         self.damageOverviewMenu = self.mainMenu.addMenu("&Damage Overview")
         self.damageOverviewMenu.addAction(self.setupGenerateDamageOverviewAction())
+
+    def updateMainWindow(self):
+
 
     def displayWarning(self, title, text):
         msgBox = QtGui.QMessageBox(self)
@@ -132,8 +168,15 @@ class Main(QtGui.QMainWindow):
         lines = self.readLines(filename)
         for line in lines:
             line = line.strip().split(';')
-            self.players.append((int(line[0]),line[1],line[2]))
+            playerId = int(line[0])
+            playerName = line[1]
+            playerImageFilename = line[2]
+            if playerId not in self.players:
+                self.players[playerId] = (playerName, playerImageFilename)
+                if (playerId => self.nextPlayerId):
+                    self.nextPlayerId = playerId + 1
         print self.players
+        print self.nextPlayerId
 
     def readDamages(self, filename):
         lines = self.readLines(filename)
@@ -153,7 +196,7 @@ class Main(QtGui.QMainWindow):
             self.displayWarning("Error", "No valid damages file selected!")
             return
 
-        self.players = []
+        self.players = {}
         self.readPlayers(self.playersFilename)
         self.damages = []
         self.readDamages(self.damagesFilename)
@@ -167,8 +210,8 @@ class Main(QtGui.QMainWindow):
     def writePlayers(self, filename):
         fd = open(filename, 'w')
         lines = []
-        for player in self.players:
-            lines.append(str(player[0]) + ";" + player[1] + ";" + player[2] + "\n")
+        for key in self.players.keys():
+            lines.append(str(key) + ";" + self.players[key][0] + ";" + self.players[key][1] + "\n")
         fd.writelines(lines)
         fd.close()
 
@@ -198,12 +241,8 @@ class Main(QtGui.QMainWindow):
             self.displayWarning("Warning", "No player image selected! Cancelling player entry.")
             return
 
-        # No players in file
-        if (not self.players):
-            playerEntry = (1, playerName, playerImageFilename)
-        else:
-            playerEntry = (self.players[-1][0] + 1, playerName, playerImageFilename)
-        self.players.append(playerEntry)
+        self.players[self.nextPlayerId] = (playerName, playerImageFilename)
+        self.nextPlayerId = self.nextPlayerId + 1
 
         self.writePlayers(self.playersFilename)
 
@@ -215,6 +254,10 @@ class Main(QtGui.QMainWindow):
 
         playerId, playerName, ok = RemovePlayerDialog.getPlayerToRemove(self.players, self)
         print(str(playerId) + ";" + playerName + ";" + str(ok))
+        if (playerId in self.players):
+            del self.players[playerId]
+            self.writePlayers(self.playersFilename)
+            self.updateMainWindow()
 
     def generateDamageOverview(self):
         print("Generate Damage Overview")
