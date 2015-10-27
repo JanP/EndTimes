@@ -36,14 +36,8 @@ def loadPixmap(playerImageFilename):
     return pixmap
 
 class PlayerLabel(QtGui.QLabel):
-    clicked = QtCore.pyqtSignal(int, 'QString', 'QString')
-
-    def __init__(self, playerId, playerName, playerImageFilename, parent = None):
+    def __init__(self, playerName, playerImageFilename, parent = None):
         super(PlayerLabel, self).__init__(parent)
-
-        self.playerId = playerId
-        self.playerName = playerName
-        self.playerImageFilename = playerImageFilename
 
         self.vbox = QtGui.QVBoxLayout(self)
 
@@ -60,6 +54,17 @@ class PlayerLabel(QtGui.QLabel):
 
     def sizeHint(self):
         return self.vbox.sizeHint()
+
+
+class ActivePlayerLabel(PlayerLabel):
+    clicked = QtCore.pyqtSignal(int, 'QString', 'QString')
+
+    def __init__(self, playerId, playerName, playerImageFilename, parent = None):
+        super(ActivePlayerLabel, self).__init__(playerName, playerImageFilename, parent)
+
+        self.playerId = playerId
+        self.playerName = playerName
+        self.playerImageFilename = playerImageFilename
 
     def mouseReleaseEvent(self, ev):
         self.clicked.emit(self.playerId, self.playerName, self.playerImageFilename)
@@ -113,7 +118,7 @@ class Main(QtGui.QMainWindow):
             if (column == 3):
                 row = row + 1
                 column = 0
-            playerLabel = PlayerLabel(playerId, self.players[playerId][0], self.players[playerId][1], self.scrollAreaContents)
+            playerLabel = ActivePlayerLabel(playerId, self.players[playerId][0], self.players[playerId][1], self.scrollAreaContents)
             playerLabel.clicked.connect(self.playerUpdate)
             self.grid.addWidget(playerLabel, row, column)
             column = column + 1
