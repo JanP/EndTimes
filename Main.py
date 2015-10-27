@@ -28,14 +28,22 @@ class RemovePlayerDialog(QtGui.QDialog):
         playerId, playerName = dialog.getRemovedPlayer()
         return (playerId, playerName, result == QtGui.QDialog.Accepted)
 
+def loadPixmap(playerImageFilename):
+    pixmap = QtGui.QPixmap(500, 500)
+    image = QtGui.QImage(playerImageFilename)
+    image = image.scaled(500, 500, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+    pixmap.convertFromImage(image)
+    return pixmap
+
 class PlayerLabel(QtGui.QLabel):
-    clicked = QtCore.pyqtSignal(int, 'QString')
+    clicked = QtCore.pyqtSignal(int, 'QString', 'QString')
 
     def __init__(self, playerId, playerName, playerImageFilename, parent = None):
         super(PlayerLabel, self).__init__(parent)
 
         self.playerId = playerId
         self.playerName = playerName
+        self.playerImageFilename = playerImageFilename
 
         self.vbox = QtGui.QVBoxLayout(self)
 
@@ -43,11 +51,7 @@ class PlayerLabel(QtGui.QLabel):
         self.name.setAlignment(QtCore.Qt.AlignCenter)
 
         self.picture = QtGui.QLabel()
-        pixmap = QtGui.QPixmap(500, 500)
-        image = QtGui.QImage(playerImageFilename)
-        image = image.scaled(500, 500, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-        pixmap.convertFromImage(image)
-        self.picture.setPixmap(pixmap)
+        self.picture.setPixmap(loadPixmap(playerImageFilename))
 
         self.vbox.addWidget(self.name)
         self.vbox.addWidget(self.picture)
@@ -58,7 +62,7 @@ class PlayerLabel(QtGui.QLabel):
         return self.vbox.sizeHint()
 
     def mouseReleaseEvent(self, ev):
-        self.clicked.emit(playerId, playerName)
+        self.clicked.emit(self.playerId, self.playerName, self.playerImageFilename)
 
 class Main(QtGui.QMainWindow):
     def __init__(self):
@@ -91,8 +95,28 @@ class Main(QtGui.QMainWindow):
         self.damageOverviewMenu = self.mainMenu.addMenu("&Damage Overview")
         self.damageOverviewMenu.addAction(self.setupGenerateDamageOverviewAction())
 
-    def updateMainWindow(self):
+        self.scrollArea = QtGui.QScrollArea(self)
+        self.scrollAreaContents = QtGui.QWidget()
+        self.scrollAreaContents.setGeometry(0, 0, 500 * 3, 500 * 3)
+        self.scrollArea.setWidget(self.scrollAreaContents)
+        self.grid = QtGui.QGridLayout()
+        self.scrollAreaContents.setLayout(self.grid)
+        self.setCentralWidget(self.scrollArea)
 
+    def playerUpdate(self, playerId, playerName, playerImageFilename):
+        print("playerUpdate" + ": " + str(playerId) + " " + playerName + " " + playerImageFilename)
+
+    def updateMainWindow(self):
+        row = 0
+        column = 0
+        for playerId in self.players.keys():
+            if (column == 3):
+                row = row + 1
+                column = 0
+            playerLabel = PlayerLabel(playerId, self.players[playerId][0], self.players[playerId][1], self.scrollAreaContents)
+            playerLabel.clicked.connect(self.playerUpdate)
+            self.grid.addWidget(playerLabel, row, column)
+            column = column + 1
 
     def displayWarning(self, title, text):
         msgBox = QtGui.QMessageBox(self)
@@ -173,7 +197,7 @@ class Main(QtGui.QMainWindow):
             playerImageFilename = line[2]
             if playerId not in self.players:
                 self.players[playerId] = (playerName, playerImageFilename)
-                if (playerId => self.nextPlayerId):
+                if (playerId >= self.nextPlayerId):
                     self.nextPlayerId = playerId + 1
         print self.players
         print self.nextPlayerId
