@@ -9,7 +9,8 @@ class RemovePlayerDialog(QtGui.QDialog):
 
         self.vbox = QtGui.QVBoxLayout(self)
         self.buttongroup = QtGui.QButtonGroup()
-        for (playerId, playerName, playerImageFilename) in players:
+        for playerId in players.keys():
+            playerName, playerImageFilename = players[playerId]
             button = QtGui.QRadioButton(playerName)
             self.buttongroup.addButton(button, playerId)
             self.vbox.addWidget(button)
@@ -27,6 +28,30 @@ class RemovePlayerDialog(QtGui.QDialog):
         result = dialog.exec_()
         playerId, playerName = dialog.getRemovedPlayer()
         return (playerId, playerName, result == QtGui.QDialog.Accepted)
+
+class AddDamageDialog(QtGui.QDialog):
+    def __init__(self, playerId, playerName, playerImageFilename, parent = None):
+        super(AddDamageDialog, self).__init__(parent)
+
+        vbox = QtGui.QVBoxLayout(self)
+
+        hbox = QtGui.QHBoxLayout(vbox)
+
+        playerLabel = PlayerLabel(playerName, playerImageFilename)
+        hbox.addWidget(playerLabel)
+
+        scrollArea = QtGui.QScrollArea(self)
+        scrollAreaContents = QtGui.QWidget()
+        scrollAreaContents.setGeometry(0, 0, 500, 500)
+        scrollArea.setWidget(self.scrollAreaContents)
+        self.grid = QtGui.QGridLayout()
+        scrollAreaContents.setLayout(self.grid)
+        hbox.addWidget(scrollArea)
+
+        buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel, QtCore.Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vbox.addWidget(buttons)
 
 def loadPixmap(playerImageFilename):
     pixmap = QtGui.QPixmap(500, 500)
@@ -76,6 +101,7 @@ class Main(QtGui.QMainWindow):
 
         self.statusBar()
         self.setupMainMenu()
+        self.setupCentralWidget()
         self.showMaximized()
 
         self.playersFilename = ""
@@ -84,6 +110,15 @@ class Main(QtGui.QMainWindow):
 
         self.damagesFilename = ""
         self.damages = []
+
+    def setupCentralWidget(self):
+        self.scrollArea = QtGui.QScrollArea(self)
+        self.scrollAreaContents = QtGui.QWidget()
+        self.scrollAreaContents.setGeometry(0, 0, 500 * 3, 500 * 3)
+        self.scrollArea.setWidget(self.scrollAreaContents)
+        self.grid = QtGui.QGridLayout()
+        self.scrollAreaContents.setLayout(self.grid)
+        self.setCentralWidget(self.scrollArea)
 
     def setupMainMenu(self):
         self.mainMenu = self.menuBar()
@@ -100,20 +135,13 @@ class Main(QtGui.QMainWindow):
         self.damageOverviewMenu = self.mainMenu.addMenu("&Damage Overview")
         self.damageOverviewMenu.addAction(self.setupGenerateDamageOverviewAction())
 
-        self.scrollArea = QtGui.QScrollArea(self)
-        self.scrollAreaContents = QtGui.QWidget()
-        self.scrollAreaContents.setGeometry(0, 0, 500 * 3, 500 * 3)
-        self.scrollArea.setWidget(self.scrollAreaContents)
-        self.grid = QtGui.QGridLayout()
-        self.scrollAreaContents.setLayout(self.grid)
-        self.setCentralWidget(self.scrollArea)
-
     def playerUpdate(self, playerId, playerName, playerImageFilename):
         print("playerUpdate" + ": " + str(playerId) + " " + playerName + " " + playerImageFilename)
 
     def updateMainWindow(self):
         row = 0
         column = 0
+        self.setupCentralWidget()
         for playerId in self.players.keys():
             if (column == 3):
                 row = row + 1
