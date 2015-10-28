@@ -80,7 +80,6 @@ class PlayerLabel(QtGui.QLabel):
     def sizeHint(self):
         return self.vbox.sizeHint()
 
-
 class ActivePlayerLabel(PlayerLabel):
     clicked = QtCore.pyqtSignal(int, 'QString', 'QString')
 
@@ -93,6 +92,113 @@ class ActivePlayerLabel(PlayerLabel):
 
     def mouseReleaseEvent(self, ev):
         self.clicked.emit(self.playerId, self.playerName, self.playerImageFilename)
+
+class AddDamageDialog(QtGui.QDialog):
+    def __init__(self, playerId, playerName, playerImageFilename, parent = None):
+        super(AddDamageDialog, self).__init__(parent)
+
+        self.playerId = playerId
+
+        self.row = 0
+
+        vbox = QtGui.QVBoxLayout(self)
+        widget = QtGui.QWidget()
+        vbox.addWidget(widget)
+        hbox = QtGui.QHBoxLayout(widget)
+
+        playerLabel = PlayerLabel(playerName, playerImageFilename)
+        hbox.addWidget(playerLabel)
+
+        scrollArea = QtGui.QScrollArea(self)
+        scrollArea.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        scrollArea.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.scrollAreaContents = QtGui.QWidget()
+        self.scrollAreaContents.setGeometry(0, 0, 500, 300)
+        self.scrollAreaContents.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
+        scrollArea.setWidget(self.scrollAreaContents)
+        self.grid = QtGui.QGridLayout()
+        self.scrollAreaContents.setLayout(self.grid)
+
+        amountLabel = QtGui.QLabel("Damage Amount", self.scrollAreaContents)
+        amountLabel.setAlignment(QtCore.Qt.AlignCenter)
+        amountLabel.setMaximumHeight(20)
+        self.grid.addWidget(amountLabel, self.row, 0)
+        typeLabel = QtGui.QLabel("Damage Type", self.scrollAreaContents)
+        typeLabel.setAlignment(QtCore.Qt.AlignCenter)
+        typeLabel.setMaximumHeight(20)
+        self.grid.addWidget(typeLabel, self.row, 1)
+        locationLabel = QtGui.QLabel("Damage Location", self.scrollAreaContents)
+        locationLabel.setAlignment(QtCore.Qt.AlignCenter)
+        locationLabel.setMaximumHeight(20)
+        self.grid.addWidget(locationLabel, self.row, 2)
+
+        self.row = self.row + 1
+
+        self.moreButton = QtGui.QPushButton(self.scrollAreaContents)
+        self.moreButton.setText("Add Damage")
+        self.moreButton.clicked.connect(self.addDamageEntry)
+        self.grid.addWidget(self.moreButton, self.row, 2)
+
+        scrollArea.setMinimumWidth(self.scrollAreaContents.minimumSizeHint().width() + scrollArea.verticalScrollBar().width())
+
+        hbox.addWidget(scrollArea)
+
+        buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel, QtCore.Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vbox.addWidget(buttons)
+
+    def addDamageEntry(self):
+        self.grid.removeWidget(self.moreButton)
+
+        damageAmount = QtGui.QSpinBox(self.scrollAreaContents)
+        self.grid.addWidget(damageAmount, self.row, 0)
+
+        damageType = QtGui.QComboBox(self.scrollAreaContents)
+        damageTypeList = QtCore.QStringList("Melee")
+        damageTypeList.append("Firearms")
+        damageTypeList.append("Explosives")
+        damageTypeList.append("Zombie")
+        damageType.addItems(damageTypeList)
+        damageType.setEditable(False)
+        damageType.setInsertPolicy(QtGui.QComboBox.NoInsert)
+        self.grid.addWidget(damageType, self.row, 1)
+
+        damageLocation = QtGui.QComboBox(self.scrollAreaContents)
+        damageLocationList = QtCore.QStringList("Head")
+        damageLocationList.append("Left Arm")
+        damageLocationList.append("Right Arm")
+        damageLocationList.append("Torso")
+        damageLocationList.append("Left Leg")
+        damageLocationList.append("Right Leg")
+        damageLocation.addItems(damageLocationList)
+        damageLocation.setEditable(False)
+        damageLocation.setInsertPolicy(QtGui.QComboBox.NoInsert)
+        self.grid.addWidget(damageLocation, self.row, 2)
+
+        self.row = self.row + 1
+
+        self.grid.addWidget(self.moreButton, self.row, 2)
+
+        self.scrollAreaContents.setGeometry(0, 0, 500, self.grid.sizeHint().width())
+
+    def getDamage(self):
+        damages = []
+        for row in range(1, self.grid.rowCount() - 1):
+            damageAmount = self.grid.itemAtPosition(row, 0).widget().value()
+            damageType = str(self.grid.itemAtPosition(row, 1).widget().currentText())
+            damageLocation = str(self.grid.itemAtPosition(row, 2).widget().currentText())
+            if (damageAmount == 0):
+                continue
+            damages.append((self.playerId, damageType, damageLocation, damageAmount))
+        return damages
+
+    @staticmethod
+    def addDamageToPlayer(playerId, playerName, playerImageFilename, parent = None):
+        dialog = AddDamageDialog(playerId, playerName, playerImageFilename, parent)
+        result = dialog.exec_()
+        damages = dialog.getDamage()
+        return (damages, result == QtGui.QDialog.Accepted)
 
 class Main(QtGui.QMainWindow):
     def __init__(self):
@@ -132,11 +238,19 @@ class Main(QtGui.QMainWindow):
         self.playerMenu.addAction(self.setupAddPlayerAction())
         self.playerMenu.addAction(self.setupRemovePlayerAction())
 
-        self.damageOverviewMenu = self.mainMenu.addMenu("&Damage Overview")
-        self.damageOverviewMenu.addAction(self.setupGenerateDamageOverviewAction())
+        self.damageMenu = self.mainMenu.addMenu("&Damage")
+        self.damageMenu.addAction(self.setupGenerateDamageOverviewAction())
+        self.damageMenu.addAction(self.setupClearDamagesAction())
 
     def playerUpdate(self, playerId, playerName, playerImageFilename):
-        print("playerUpdate" + ": " + str(playerId) + " " + playerName + " " + playerImageFilename)
+        damages, ok = AddDamageDialog.addDamageToPlayer(playerId, playerName, playerImageFilename, self)
+        if (not ok):
+            return
+
+        for damage in damages:
+            self.damages.append(damage)
+        
+        self.writeDamages(self.damagesFilename)
 
     def updateMainWindow(self):
         row = 0
@@ -199,6 +313,12 @@ class Main(QtGui.QMainWindow):
         self.generateDamageOverviewAction.triggered.connect(self.generateDamageOverview)
         return self.generateDamageOverviewAction
 
+    def setupClearDamagesAction(self):
+        self.clearDamagesAction = QtGui.QAction("&Clear Damages", self)
+        self.clearDamagesAction.setStatusTip("Clear all damages")
+        self.clearDamagesAction.triggered.connect(self.clearDamages)
+        return self.clearDamagesAction
+
     def new(self):
         self.playersFilename = QtGui.QFileDialog.getSaveFileName(self, "Create New Players File", "Players.csv", "*.csv")
         if (self.playersFilename == ""):
@@ -232,15 +352,12 @@ class Main(QtGui.QMainWindow):
                 self.players[playerId] = (playerName, playerImageFilename)
                 if (playerId >= self.nextPlayerId):
                     self.nextPlayerId = playerId + 1
-        print self.players
-        print self.nextPlayerId
 
     def readDamages(self, filename):
         lines = self.readLines(filename)
         for line in lines:
             line = line.strip().split(';')
             self.damages.append((int(line[0]),line[1],line[2],int(line[3])))
-        print self.damages
 
     def open(self):
         self.playersFilename = QtGui.QFileDialog.getOpenFileName(self, "Open Existing Players File", "Players.csv", "*.csv")
@@ -261,7 +378,8 @@ class Main(QtGui.QMainWindow):
         self.updateMainWindow()
 
     def close(self):
-        print("Quiting")
+        self.writePlayers(self.playersFilename)
+        self.writeDamages(self.damagesFilename)
         sys.exit()
 
     def writePlayers(self, filename):
@@ -281,8 +399,6 @@ class Main(QtGui.QMainWindow):
         fd.close()
 
     def addPlayer(self):
-        print("Add Player")
-
         # No players file selected
         if (self.playersFilename == ""):
             self.displayWarning("Error", "No valid players file selected!")
@@ -310,21 +426,24 @@ class Main(QtGui.QMainWindow):
             return
 
         playerId, playerName, ok = RemovePlayerDialog.getPlayerToRemove(self.players, self)
-        print(str(playerId) + ";" + playerName + ";" + str(ok))
+
+        if (not ok):
+            return
+
         if (playerId in self.players):
             del self.players[playerId]
             self.writePlayers(self.playersFilename)
             self.updateMainWindow()
 
     def generateDamageOverview(self):
-        print("Generate Damage Overview")
-
         filename = QtGui.QFileDialog.getSaveFileName(self, "Save Damage Overview", "DamageOverview.pdf", "*.pdf")
 
         printer = QtGui.QPrinter()
         printer.setPageSize(QtGui.QPrinter.A4)
         printer.setOutputFormat(QtGui.QPrinter.PdfFormat)
         printer.setOutputFileName(filename)
+
+        row = 0
 
         document = QtGui.QTextDocument()
         header = QtGui.QTextCursor(document)
@@ -334,7 +453,22 @@ class Main(QtGui.QMainWindow):
         table.cellAt(0, 1).firstCursorPosition().insertText("Damage Type")
         table.cellAt(0, 2).firstCursorPosition().insertText("Damage Location")
         table.cellAt(0, 3).firstCursorPosition().insertText("Damage Amount")
+
+        row = row + 1
+
+        for damage in self.damages:
+            table.appendRows(1)
+            table.cellAt(row, 0).firstCursorPosition().insertText(self.players[damage[0]][0])
+            table.cellAt(row, 1).firstCursorPosition().insertText(damage[1])
+            table.cellAt(row, 2).firstCursorPosition().insertText(damage[2])
+            table.cellAt(row, 3).firstCursorPosition().insertText(str(damage[3]))
+            row = row + 1
+
         document.print_(printer)
+
+    def clearDamages(self):
+        self.damages = []
+        self.writeDamages(self.damagesFilename)
 
 def run():
     app = QtGui.QApplication(sys.argv)
