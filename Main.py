@@ -378,6 +378,8 @@ class Main(QtGui.QMainWindow):
         self.updateMainWindow()
 
     def close(self):
+        if ((self.playersFilename == "") && (self.damagesFilename == "")):
+            sys.exit()
         self.writePlayers(self.playersFilename)
         self.writeDamages(self.damagesFilename)
         sys.exit()
